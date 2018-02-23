@@ -31,9 +31,7 @@ import io.opencensus.stats.StatsCollectionState;
 import io.opencensus.stats.StatsComponent;
 import io.opencensus.stats.StatsRecorder;
 import io.opencensus.stats.View;
-import io.opencensus.stats.View.AggregationWindow.Cumulative;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
 import io.opencensus.stats.ViewManager;
 import io.opencensus.tags.Tag;
 import io.opencensus.tags.TagContext;
@@ -72,13 +70,7 @@ public final class StatsRecorderImplTest {
   @Test
   public void record_CurrentContextNotSet() {
     View view =
-        View.create(
-            VIEW_NAME,
-            "description",
-            MEASURE_DOUBLE,
-            Sum.create(),
-            Arrays.asList(KEY),
-            Cumulative.create());
+        View.create(VIEW_NAME, "description", MEASURE_DOUBLE, Sum.create(), Arrays.asList(KEY));
     viewManager.registerView(view);
     statsRecorder.newMeasureMap().put(MEASURE_DOUBLE, 1.0).record();
     ViewData viewData = viewManager.getView(VIEW_NAME);
@@ -91,13 +83,7 @@ public final class StatsRecorderImplTest {
   @Test
   public void record_CurrentContextSet() {
     View view =
-        View.create(
-            VIEW_NAME,
-            "description",
-            MEASURE_DOUBLE,
-            Sum.create(),
-            Arrays.asList(KEY),
-            Cumulative.create());
+        View.create(VIEW_NAME, "description", MEASURE_DOUBLE, Sum.create(), Arrays.asList(KEY));
     viewManager.registerView(view);
     Context orig =
         Context.current()
@@ -117,13 +103,7 @@ public final class StatsRecorderImplTest {
   @Test
   public void record_UnregisteredMeasure() {
     View view =
-        View.create(
-            VIEW_NAME,
-            "description",
-            MEASURE_DOUBLE,
-            Sum.create(),
-            Arrays.asList(KEY),
-            Cumulative.create());
+        View.create(VIEW_NAME, "description", MEASURE_DOUBLE, Sum.create(), Arrays.asList(KEY));
     viewManager.registerView(view);
     statsRecorder
         .newMeasureMap()
@@ -145,13 +125,7 @@ public final class StatsRecorderImplTest {
   @Test
   public void recordTwice() {
     View view =
-        View.create(
-            VIEW_NAME,
-            "description",
-            MEASURE_DOUBLE,
-            Sum.create(),
-            Arrays.asList(KEY),
-            Cumulative.create());
+        View.create(VIEW_NAME, "description", MEASURE_DOUBLE, Sum.create(), Arrays.asList(KEY));
     viewManager.registerView(view);
     MeasureMap statsRecord = statsRecorder.newMeasureMap().put(MEASURE_DOUBLE, 1.0);
     statsRecord.record(new SimpleTagContext(Tag.create(KEY, VALUE)));
@@ -173,13 +147,7 @@ public final class StatsRecorderImplTest {
   @SuppressWarnings("deprecation")
   public void record_StatsDisabled() {
     View view =
-        View.create(
-            VIEW_NAME,
-            "description",
-            MEASURE_DOUBLE,
-            Sum.create(),
-            Arrays.asList(KEY),
-            Cumulative.create());
+        View.create(VIEW_NAME, "description", MEASURE_DOUBLE, Sum.create(), Arrays.asList(KEY));
 
     viewManager.registerView(view);
     statsComponent.setState(StatsCollectionState.DISABLED);
@@ -194,13 +162,7 @@ public final class StatsRecorderImplTest {
   @SuppressWarnings("deprecation")
   public void record_StatsReenabled() {
     View view =
-        View.create(
-            VIEW_NAME,
-            "description",
-            MEASURE_DOUBLE,
-            Sum.create(),
-            Arrays.asList(KEY),
-            Cumulative.create());
+        View.create(VIEW_NAME, "description", MEASURE_DOUBLE, Sum.create(), Arrays.asList(KEY));
     viewManager.registerView(view);
 
     statsComponent.setState(StatsCollectionState.DISABLED);
@@ -212,8 +174,8 @@ public final class StatsRecorderImplTest {
 
     statsComponent.setState(StatsCollectionState.ENABLED);
     assertThat(viewManager.getView(VIEW_NAME).getAggregationMap()).isEmpty();
-    assertThat(viewManager.getView(VIEW_NAME).getWindowData())
-        .isNotEqualTo(CumulativeData.create(ZERO_TIMESTAMP, ZERO_TIMESTAMP));
+    assertThat(viewManager.getView(VIEW_NAME).getStart()).isNotEqualTo(ZERO_TIMESTAMP);
+    assertThat(viewManager.getView(VIEW_NAME).getEnd()).isNotEqualTo(ZERO_TIMESTAMP);
     statsRecorder
         .newMeasureMap()
         .put(MEASURE_DOUBLE, 4.0)

@@ -26,7 +26,6 @@ import io.opencensus.stats.View;
 import io.opencensus.stats.View.AggregationWindow.Cumulative;
 import io.opencensus.stats.View.Name;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
 import io.opencensus.tags.TagKey;
 import io.opencensus.testing.common.TestClock;
 import java.util.Arrays;
@@ -62,8 +61,8 @@ public class MeasureToViewMapTest {
     clock.setTime(Timestamp.create(30, 40));
     ViewData viewData = measureToViewMap.getView(VIEW_NAME, clock, StatsCollectionState.ENABLED);
     assertThat(viewData.getView()).isEqualTo(VIEW);
-    assertThat(viewData.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(10, 20), Timestamp.create(30, 40)));
+    assertThat(viewData.getStart()).isEqualTo(Timestamp.create(10, 20));
+    assertThat(viewData.getEnd()).isEqualTo(Timestamp.create(30, 40));
     assertThat(viewData.getAggregationMap()).isEmpty();
   }
 }

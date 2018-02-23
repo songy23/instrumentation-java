@@ -88,12 +88,18 @@ abstract class MutableViewData {
    * @param start the start {@code Timestamp}.
    * @return a {@code MutableViewData}.
    */
+  @SuppressWarnings("deprecation")
   static MutableViewData create(final View view, final Timestamp start) {
-    return view.getWindow()
-        .match(
-            new CreateCumulative(view, start),
-            new CreateInterval(view, start),
-            Functions.<MutableViewData>throwAssertionError());
+    View.AggregationWindow window = view.getWindow();
+    if (window == null) {
+      return new CumulativeMutableViewData(view, start);
+    } else {
+      // TODO(songya): remove this once Window is removed.
+      return window.match(
+          new CreateCumulative(view, start),
+          new CreateInterval(view, start),
+          Functions.<MutableViewData>throwAssertionError());
+    }
   }
 
   /** The {@link View} associated with this {@link ViewData}. */
@@ -227,13 +233,15 @@ abstract class MutableViewData {
         return ViewData.create(
             super.view,
             createAggregationMap(tagValueAggregationMap, super.view.getMeasure()),
-            ViewData.AggregationWindowData.CumulativeData.create(start, now));
+            start,
+            now);
       } else {
         // If Stats state is DISABLED, return an empty ViewData.
         return ViewData.create(
             super.view,
             Collections.<List<TagValue>, AggregationData>emptyMap(),
-            ViewData.AggregationWindowData.CumulativeData.create(ZERO_TIMESTAMP, ZERO_TIMESTAMP));
+            ZERO_TIMESTAMP,
+            ZERO_TIMESTAMP);
       }
     }
 
@@ -281,6 +289,7 @@ abstract class MutableViewData {
    *    expired one, so that bucket queue is up-to-date. Now we combine stats from all buckets and
    *    return the combined IntervalViewData.
    */
+  @SuppressWarnings("deprecation")
   private static final class IntervalMutableViewData extends MutableViewData {
 
     // TODO(songya): allow customizable bucket size in the future.
@@ -295,13 +304,19 @@ abstract class MutableViewData {
 
     private IntervalMutableViewData(View view, Timestamp start) {
       super(view);
-      Duration totalDuration = ((View.AggregationWindow.Interval) view.getWindow()).getDuration();
-      this.totalDuration = totalDuration;
-      this.bucketDuration = Duration.fromMillis(toMillis(totalDuration) / N);
+      View.AggregationWindow.Interval window = (View.AggregationWindow.Interval) view.getWindow();
 
-      // When initializing. add N empty buckets prior to the start timestamp of this
-      // IntervalMutableViewData, so that the last bucket will be the current one in effect.
-      shiftBucketList(N + 1, start);
+      if (window == null) { // work around checker framework
+        throw new AssertionError();
+      } else {
+        Duration totalDuration = window.getDuration();
+        this.totalDuration = totalDuration;
+        this.bucketDuration = Duration.fromMillis(toMillis(totalDuration) / N);
+
+        // When initializing. add N empty buckets prior to the start timestamp of this
+        // IntervalMutableViewData, so that the last bucket will be the current one in effect.
+        shiftBucketList(N + 1, start);
+      }
     }
 
     @Override
@@ -326,7 +341,8 @@ abstract class MutableViewData {
         return ViewData.create(
             super.view,
             Collections.<List<TagValue>, AggregationData>emptyMap(),
-            ViewData.AggregationWindowData.IntervalData.create(ZERO_TIMESTAMP));
+            ZERO_TIMESTAMP,
+            ZERO_TIMESTAMP);
       }
     }
 
@@ -575,6 +591,7 @@ abstract class MutableViewData {
     private static final CreateDistributionData INSTANCE = new CreateDistributionData();
   }
 
+  @SuppressWarnings("deprecation")
   private static final class CreateCumulative
       implements Function<View.AggregationWindow.Cumulative, MutableViewData> {
     @Override
@@ -591,6 +608,7 @@ abstract class MutableViewData {
     }
   }
 
+  @SuppressWarnings("deprecation")
   private static final class CreateInterval
       implements Function<View.AggregationWindow.Interval, MutableViewData> {
     @Override

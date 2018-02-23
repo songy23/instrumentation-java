@@ -86,12 +86,14 @@ final class MeasureToViewMap {
   }
 
   // Returns the subset of the given views that should be exported
+  @SuppressWarnings("deprecation")
   private static Set<View> filterExportedViews(Collection<View> allViews) {
     Set<View> views = Sets.newHashSet();
     for (View view : allViews) {
-      if (view.getWindow() instanceof View.AggregationWindow.Cumulative) {
-        views.add(view);
+      if (view.getWindow() instanceof View.AggregationWindow.Interval) {
+        continue;
       }
+      views.add(view);
     }
     return Collections.unmodifiableSet(views);
   }

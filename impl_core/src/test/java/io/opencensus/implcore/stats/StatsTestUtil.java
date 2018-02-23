@@ -32,9 +32,6 @@ import io.opencensus.stats.AggregationData.SumDataLong;
 import io.opencensus.stats.Measure;
 import io.opencensus.stats.View;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
-import io.opencensus.stats.ViewData.AggregationWindowData.IntervalData;
 import io.opencensus.tags.TagValue;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -139,13 +136,8 @@ final class StatsTestUtil {
     return ViewData.create(
         view,
         Collections.<List<TagValue>, AggregationData>emptyMap(),
-        view.getWindow()
-            .match(
-                Functions.<AggregationWindowData>returnConstant(
-                    CumulativeData.create(ZERO_TIMESTAMP, ZERO_TIMESTAMP)),
-                Functions.<AggregationWindowData>returnConstant(
-                    IntervalData.create(ZERO_TIMESTAMP)),
-                Functions.<AggregationWindowData>throwAssertionError()));
+        ZERO_TIMESTAMP,
+        ZERO_TIMESTAMP);
   }
 
   // Compare the expected and actual DistributionData within the given tolerance.

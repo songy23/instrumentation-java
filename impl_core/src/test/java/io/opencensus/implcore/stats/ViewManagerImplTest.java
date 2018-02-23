@@ -45,9 +45,6 @@ import io.opencensus.stats.View.AggregationWindow.Cumulative;
 import io.opencensus.stats.View.AggregationWindow.Interval;
 import io.opencensus.stats.View.Name;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
-import io.opencensus.stats.ViewData.AggregationWindowData.IntervalData;
 import io.opencensus.tags.TagContext;
 import io.opencensus.tags.TagKey;
 import io.opencensus.tags.TagValue;
@@ -65,6 +62,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 /** Tests for {@link ViewManagerImpl}. */
+@SuppressWarnings("deprecation")
 @RunWith(JUnit4.class)
 public class ViewManagerImplTest {
 
@@ -126,7 +124,7 @@ public class ViewManagerImplTest {
 
   private static View createCumulativeView(
       View.Name name, Measure measure, Aggregation aggregation, List<TagKey> keys) {
-    return View.create(name, VIEW_DESCRIPTION, measure, aggregation, keys, CUMULATIVE);
+    return View.create(name, VIEW_DESCRIPTION, measure, aggregation, keys);
   }
 
   @Test
@@ -135,7 +133,6 @@ public class ViewManagerImplTest {
     viewManager.registerView(view);
     assertThat(viewManager.getView(VIEW_NAME).getView()).isEqualTo(view);
     assertThat(viewManager.getView(VIEW_NAME).getAggregationMap()).isEmpty();
-    assertThat(viewManager.getView(VIEW_NAME).getWindowData()).isInstanceOf(CumulativeData.class);
   }
 
   @Test
@@ -171,8 +168,7 @@ public class ViewManagerImplTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Arrays.asList(KEY));
     viewManager.registerView(view1);
     Set<View> exported = viewManager.getAllExportedViews();
 
@@ -182,8 +178,7 @@ public class ViewManagerImplTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Arrays.asList(KEY));
     thrown.expect(UnsupportedOperationException.class);
     exported.add(view2);
   }
@@ -201,7 +196,6 @@ public class ViewManagerImplTest {
     viewManager.registerView(intervalView);
     assertThat(viewManager.getView(VIEW_NAME).getView()).isEqualTo(intervalView);
     assertThat(viewManager.getView(VIEW_NAME).getAggregationMap()).isEmpty();
-    assertThat(viewManager.getView(VIEW_NAME).getWindowData()).isInstanceOf(IntervalData.class);
   }
 
   @Test
@@ -216,20 +210,14 @@ public class ViewManagerImplTest {
   public void preventRegisteringDifferentViewWithSameName() {
     View view1 =
         View.create(
-            VIEW_NAME,
-            "View description.",
-            MEASURE_DOUBLE,
-            DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            VIEW_NAME, "View description.", MEASURE_DOUBLE, DISTRIBUTION, Arrays.asList(KEY));
     View view2 =
         View.create(
             VIEW_NAME,
             "This is a different description.",
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Arrays.asList(KEY));
     testFailedToRegisterView(
         view1, view2, "A different view with the same name is already registered");
   }
@@ -239,11 +227,9 @@ public class ViewManagerImplTest {
     MeasureDouble measure1 = MeasureDouble.create("measure", "description", "1");
     MeasureLong measure2 = MeasureLong.create("measure", "description", "1");
     View view1 =
-        View.create(
-            VIEW_NAME, VIEW_DESCRIPTION, measure1, DISTRIBUTION, Arrays.asList(KEY), CUMULATIVE);
+        View.create(VIEW_NAME, VIEW_DESCRIPTION, measure1, DISTRIBUTION, Arrays.asList(KEY));
     View view2 =
-        View.create(
-            VIEW_NAME_2, VIEW_DESCRIPTION, measure2, DISTRIBUTION, Arrays.asList(KEY), CUMULATIVE);
+        View.create(VIEW_NAME_2, VIEW_DESCRIPTION, measure2, DISTRIBUTION, Arrays.asList(KEY));
     testFailedToRegisterView(
         view1, view2, "A different measure with the same name is already registered");
   }
@@ -295,8 +281,8 @@ public class ViewManagerImplTest {
     clock.setTime(Timestamp.create(3, 4));
     ViewData viewData = viewManager.getView(VIEW_NAME);
     assertThat(viewData.getView()).isEqualTo(view);
-    assertThat(viewData.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(1, 2), Timestamp.create(3, 4)));
+    assertThat(viewData.getStart()).isEqualTo(Timestamp.create(1, 2));
+    assertThat(viewData.getEnd()).isEqualTo(Timestamp.create(3, 4));
     StatsTestUtil.assertAggregationMapEquals(
         viewData.getAggregationMap(),
         ImmutableMap.of(
@@ -443,8 +429,8 @@ public class ViewManagerImplTest {
     statsRecorder.newMeasureMap().put(MEASURE_DOUBLE, 0.1).record(tags);
     clock.setTime(Timestamp.create(11, 0));
     ViewData viewData1 = viewManager.getView(VIEW_NAME);
-    assertThat(viewData1.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(10, 0), Timestamp.create(11, 0)));
+    assertThat(viewData1.getStart()).isEqualTo(Timestamp.create(10, 0));
+    assertThat(viewData1.getEnd()).isEqualTo(Timestamp.create(11, 0));
     StatsTestUtil.assertAggregationMapEquals(
         viewData1.getAggregationMap(),
         ImmutableMap.of(
@@ -458,8 +444,8 @@ public class ViewManagerImplTest {
 
     // The second view should have the same start time as the first view, and it should include both
     // recorded values:
-    assertThat(viewData2.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(10, 0), Timestamp.create(12, 0)));
+    assertThat(viewData2.getStart()).isEqualTo(Timestamp.create(10, 0));
+    assertThat(viewData2.getEnd()).isEqualTo(Timestamp.create(12, 0));
     StatsTestUtil.assertAggregationMapEquals(
         viewData2.getAggregationMap(),
         ImmutableMap.of(
@@ -720,17 +706,17 @@ public class ViewManagerImplTest {
     clock.setTime(Timestamp.create(3, 3));
     ViewData viewData1 = viewManager.getView(VIEW_NAME);
     clock.setTime(Timestamp.create(4, 4));
-    ViewData viewData2 = viewManager.getView(VIEW_NAME_2);
-    assertThat(viewData1.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(1, 1), Timestamp.create(3, 3)));
+    assertThat(viewData1.getStart()).isEqualTo(Timestamp.create(1, 1));
+    assertThat(viewData1.getEnd()).isEqualTo(Timestamp.create(3, 3));
     StatsTestUtil.assertAggregationMapEquals(
         viewData1.getAggregationMap(),
         ImmutableMap.of(
             Arrays.asList(VALUE),
             StatsTestUtil.createAggregationData(DISTRIBUTION, MEASURE_DOUBLE, 5.0)),
         EPSILON);
-    assertThat(viewData2.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(2, 2), Timestamp.create(4, 4)));
+    ViewData viewData2 = viewManager.getView(VIEW_NAME_2);
+    assertThat(viewData2.getStart()).isEqualTo(Timestamp.create(2, 2));
+    assertThat(viewData2.getEnd()).isEqualTo(Timestamp.create(4, 4));
     StatsTestUtil.assertAggregationMapEquals(
         viewData2.getAggregationMap(),
         ImmutableMap.of(
@@ -774,17 +760,17 @@ public class ViewManagerImplTest {
     clock.setTime(Timestamp.create(3, 0));
     ViewData viewData1 = viewManager.getView(VIEW_NAME);
     clock.setTime(Timestamp.create(4, 0));
-    ViewData viewData2 = viewManager.getView(VIEW_NAME_2);
-    assertThat(viewData1.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(1, 0), Timestamp.create(3, 0)));
+    assertThat(viewData1.getStart()).isEqualTo(Timestamp.create(1, 0));
+    assertThat(viewData1.getEnd()).isEqualTo(Timestamp.create(3, 0));
     StatsTestUtil.assertAggregationMapEquals(
         viewData1.getAggregationMap(),
         ImmutableMap.of(
             Arrays.asList(VALUE),
             StatsTestUtil.createAggregationData(DISTRIBUTION, measure1, value1)),
         EPSILON);
-    assertThat(viewData2.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(2, 0), Timestamp.create(4, 0)));
+    ViewData viewData2 = viewManager.getView(VIEW_NAME_2);
+    assertThat(viewData2.getStart()).isEqualTo(Timestamp.create(2, 0));
+    assertThat(viewData2.getEnd()).isEqualTo(Timestamp.create(4, 0));
     StatsTestUtil.assertAggregationMapEquals(
         viewData2.getAggregationMap(),
         ImmutableMap.of(
@@ -806,8 +792,8 @@ public class ViewManagerImplTest {
         .record(tagger.emptyBuilder().put(KEY, VALUE).build());
     clock.setTime(Timestamp.create(3, 0));
     ViewData viewData = viewManager.getView(VIEW_NAME);
-    assertThat(viewData.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(1, 0), Timestamp.create(3, 0)));
+    assertThat(viewData.getStart()).isEqualTo(Timestamp.create(1, 0));
+    assertThat(viewData.getEnd()).isEqualTo(Timestamp.create(3, 0));
     StatsTestUtil.assertAggregationMapEquals(
         viewData.getAggregationMap(),
         ImmutableMap.of(
@@ -827,8 +813,8 @@ public class ViewManagerImplTest {
         .record(tagger.emptyBuilder().put(KEY, VALUE).build());
     clock.setTime(Timestamp.create(3, 0));
     ViewData viewData = viewManager.getView(VIEW_NAME);
-    assertThat(viewData.getWindowData())
-        .isEqualTo(CumulativeData.create(Timestamp.create(1, 0), Timestamp.create(3, 0)));
+    assertThat(viewData.getStart()).isEqualTo(Timestamp.create(1, 0));
+    assertThat(viewData.getEnd()).isEqualTo(Timestamp.create(3, 0));
     StatsTestUtil.assertAggregationMapEquals(
         viewData.getAggregationMap(),
         ImmutableMap.of(
@@ -960,12 +946,10 @@ public class ViewManagerImplTest {
     // non-zero TimeStamps.
     ViewData viewData = viewManager.getView(view.getName());
     assertThat(viewData.getAggregationMap()).isEmpty();
-    AggregationWindowData windowData = viewData.getWindowData();
-    if (windowData instanceof CumulativeData) {
-      assertThat(windowData).isEqualTo(CumulativeData.create(timestamp3, timestamp4));
-    } else {
-      assertThat(windowData).isEqualTo(IntervalData.create(timestamp4));
+    if (view.getWindow() instanceof View.AggregationWindow.Cumulative) {
+      assertThat(viewData.getStart()).isEqualTo(timestamp3);
     }
+    assertThat(viewData.getEnd()).isEqualTo(timestamp4);
   }
 
   private static MeasureMap putToMeasureMap(MeasureMap measureMap, Measure measure, double value) {
