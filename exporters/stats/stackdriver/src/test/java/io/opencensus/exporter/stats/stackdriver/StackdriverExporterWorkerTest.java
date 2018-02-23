@@ -42,11 +42,8 @@ import io.opencensus.stats.AggregationData;
 import io.opencensus.stats.AggregationData.SumDataLong;
 import io.opencensus.stats.Measure.MeasureLong;
 import io.opencensus.stats.View;
-import io.opencensus.stats.View.AggregationWindow.Cumulative;
-import io.opencensus.stats.View.AggregationWindow.Interval;
 import io.opencensus.stats.View.Name;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
 import io.opencensus.stats.ViewManager;
 import io.opencensus.tags.TagKey;
 import io.opencensus.tags.TagValue;
@@ -78,8 +75,6 @@ public class StackdriverExporterWorkerTest {
       MeasureLong.create(MEASURE_NAME, MEASURE_DESCRIPTION, MEASURE_UNIT);
   private static final Name VIEW_NAME = Name.create("my view");
   private static final String VIEW_DESCRIPTION = "view description";
-  private static final Cumulative CUMULATIVE = Cumulative.create();
-  private static final Interval INTERVAL = Interval.create(ONE_SECOND);
   private static final Sum SUM = Sum.create();
   private static final MonitoredResource DEFAULT_RESOURCE =
       MonitoredResource.newBuilder().setType("global").build();
@@ -115,13 +110,13 @@ public class StackdriverExporterWorkerTest {
 
   @Test
   public void export() throws IOException {
-    View view =
-        View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY), CUMULATIVE);
+    View view = View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY));
     ViewData viewData =
         ViewData.create(
             view,
             ImmutableMap.of(Arrays.asList(VALUE), SumDataLong.create(1)),
-            CumulativeData.create(Timestamp.fromMillis(100), Timestamp.fromMillis(200)));
+            Timestamp.fromMillis(100),
+            Timestamp.fromMillis(200));
     doReturn(ImmutableSet.of(view)).when(mockViewManager).getAllExportedViews();
     doReturn(viewData).when(mockViewManager).getView(VIEW_NAME);
 
@@ -158,13 +153,13 @@ public class StackdriverExporterWorkerTest {
 
   @Test
   public void doNotExportForEmptyViewData() {
-    View view =
-        View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY), CUMULATIVE);
+    View view = View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY));
     ViewData empty =
         ViewData.create(
             view,
             Collections.<List<TagValue>, AggregationData>emptyMap(),
-            CumulativeData.create(Timestamp.fromMillis(100), Timestamp.fromMillis(200)));
+            Timestamp.fromMillis(100),
+            Timestamp.fromMillis(200));
     doReturn(ImmutableSet.of(view)).when(mockViewManager).getAllExportedViews();
     doReturn(empty).when(mockViewManager).getView(VIEW_NAME);
 
@@ -183,8 +178,7 @@ public class StackdriverExporterWorkerTest {
 
   @Test
   public void doNotExportIfFailedToRegisterView() {
-    View view =
-        View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY), CUMULATIVE);
+    View view = View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY));
     doReturn(ImmutableSet.of(view)).when(mockViewManager).getAllExportedViews();
     doThrow(new IllegalArgumentException()).when(mockStub).createMetricDescriptorCallable();
     StackdriverExporterWorker worker =
@@ -210,19 +204,13 @@ public class StackdriverExporterWorkerTest {
             ONE_SECOND,
             mockViewManager,
             DEFAULT_RESOURCE);
-    View view1 =
-        View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY), CUMULATIVE);
+    View view1 = View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY));
     assertThat(worker.registerView(view1)).isTrue();
     verify(mockStub, times(1)).createMetricDescriptorCallable();
 
     View view2 =
         View.create(
-            VIEW_NAME,
-            "This is a different description.",
-            MEASURE,
-            SUM,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            VIEW_NAME, "This is a different description.", MEASURE, SUM, Arrays.asList(KEY));
     assertThat(worker.registerView(view2)).isFalse();
     verify(mockStub, times(1)).createMetricDescriptorCallable();
   }
@@ -236,28 +224,12 @@ public class StackdriverExporterWorkerTest {
             ONE_SECOND,
             mockViewManager,
             DEFAULT_RESOURCE);
-    View view =
-        View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY), CUMULATIVE);
+    View view = View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY));
     assertThat(worker.registerView(view)).isTrue();
     verify(mockStub, times(1)).createMetricDescriptorCallable();
 
     assertThat(worker.registerView(view)).isTrue();
     verify(mockStub, times(1)).createMetricDescriptorCallable();
-  }
-
-  @Test
-  public void doNotCreateMetricDescriptorForIntervalView() {
-    StackdriverExporterWorker worker =
-        new StackdriverExporterWorker(
-            PROJECT_ID,
-            new FakeMetricServiceClient(mockStub),
-            ONE_SECOND,
-            mockViewManager,
-            DEFAULT_RESOURCE);
-    View view =
-        View.create(VIEW_NAME, VIEW_DESCRIPTION, MEASURE, SUM, Arrays.asList(KEY), INTERVAL);
-    assertThat(worker.registerView(view)).isFalse();
-    verify(mockStub, times(0)).createMetricDescriptorCallable();
   }
 
   /*

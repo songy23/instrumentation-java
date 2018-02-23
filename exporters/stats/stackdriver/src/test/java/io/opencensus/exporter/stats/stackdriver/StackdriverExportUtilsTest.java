@@ -31,7 +31,6 @@ import com.google.monitoring.v3.Point;
 import com.google.monitoring.v3.TimeInterval;
 import com.google.monitoring.v3.TimeSeries;
 import com.google.monitoring.v3.TypedValue;
-import io.opencensus.common.Duration;
 import io.opencensus.common.Timestamp;
 import io.opencensus.stats.Aggregation.Count;
 import io.opencensus.stats.Aggregation.Distribution;
@@ -46,12 +45,8 @@ import io.opencensus.stats.BucketBoundaries;
 import io.opencensus.stats.Measure.MeasureDouble;
 import io.opencensus.stats.Measure.MeasureLong;
 import io.opencensus.stats.View;
-import io.opencensus.stats.View.AggregationWindow.Cumulative;
-import io.opencensus.stats.View.AggregationWindow.Interval;
 import io.opencensus.stats.View.Name;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
-import io.opencensus.stats.ViewData.AggregationWindowData.IntervalData;
 import io.opencensus.tags.TagKey;
 import io.opencensus.tags.TagValue;
 import java.lang.management.ManagementFactory;
@@ -83,9 +78,6 @@ public class StackdriverExportUtilsTest {
       MeasureLong.create("measure2", MEASURE_DESCRIPTION, MEASURE_UNIT);
   private static final String VIEW_NAME = "view";
   private static final String VIEW_DESCRIPTION = "view description";
-  private static final Duration TEN_SECONDS = Duration.create(10, 0);
-  private static final Cumulative CUMULATIVE = Cumulative.create();
-  private static final Interval INTERVAL = Interval.create(TEN_SECONDS);
   private static final BucketBoundaries BUCKET_BOUNDARIES =
       BucketBoundaries.create(Arrays.asList(0.0, 1.0, 3.0, 5.0));
   private static final Sum SUM = Sum.create();
@@ -112,14 +104,6 @@ public class StackdriverExportUtilsTest {
                 .setDescription(StackdriverExportUtils.LABEL_DESCRIPTION)
                 .setValueType(ValueType.STRING)
                 .build());
-  }
-
-  @Test
-  public void createMetricKind() {
-    assertThat(StackdriverExportUtils.createMetricKind(CUMULATIVE))
-        .isEqualTo(MetricKind.CUMULATIVE);
-    assertThat(StackdriverExportUtils.createMetricKind(INTERVAL))
-        .isEqualTo(MetricKind.UNRECOGNIZED);
   }
 
   @Test
@@ -150,8 +134,7 @@ public class StackdriverExportUtilsTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Arrays.asList(KEY));
     assertThat(StackdriverExportUtils.createMetric(view, Arrays.asList(VALUE_1)))
         .isEqualTo(
             Metric.newBuilder()
@@ -169,8 +152,7 @@ public class StackdriverExportUtilsTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY, KEY_2, KEY_3),
-            CUMULATIVE);
+            Arrays.asList(KEY, KEY_2, KEY_3));
     assertThat(StackdriverExportUtils.createMetric(view, Arrays.asList(VALUE_1, null, VALUE_2)))
         .isEqualTo(
             Metric.newBuilder()
@@ -189,8 +171,7 @@ public class StackdriverExportUtilsTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY, KEY_2, KEY_3),
-            CUMULATIVE);
+            Arrays.asList(KEY, KEY_2, KEY_3));
     List<TagValue> tagValues = Arrays.asList(VALUE_1, null);
     thrown.expect(IllegalArgumentException.class);
     thrown.expectMessage("TagKeys and TagValues don't have same size.");
@@ -209,28 +190,6 @@ public class StackdriverExportUtilsTest {
     Timestamp censusTimestamp2 = Timestamp.create(-100, -3000);
     assertThat(StackdriverExportUtils.convertTimestamp(censusTimestamp2))
         .isEqualTo(com.google.protobuf.Timestamp.newBuilder().build());
-  }
-
-  @Test
-  public void createTimeInterval_cumulative() {
-    Timestamp censusTimestamp1 = Timestamp.create(100, 3000);
-    Timestamp censusTimestamp2 = Timestamp.create(200, 0);
-    assertThat(
-            StackdriverExportUtils.createTimeInterval(
-                CumulativeData.create(censusTimestamp1, censusTimestamp2)))
-        .isEqualTo(
-            TimeInterval.newBuilder()
-                .setStartTime(StackdriverExportUtils.convertTimestamp(censusTimestamp1))
-                .setEndTime(StackdriverExportUtils.convertTimestamp(censusTimestamp2))
-                .build());
-  }
-
-  @Test
-  public void createTimeInterval_interval() {
-    IntervalData intervalData = IntervalData.create(Timestamp.create(200, 0));
-    // Only Cumulative view will supported in this version.
-    thrown.expect(IllegalArgumentException.class);
-    StackdriverExportUtils.createTimeInterval(intervalData);
   }
 
   @Test
@@ -282,27 +241,23 @@ public class StackdriverExportUtilsTest {
   }
 
   @Test
-  public void createPoint_cumulative() {
+  public void createPoint() {
     Timestamp censusTimestamp1 = Timestamp.create(100, 3000);
     Timestamp censusTimestamp2 = Timestamp.create(200, 0);
-    CumulativeData cumulativeData = CumulativeData.create(censusTimestamp1, censusTimestamp2);
     SumDataDouble sumDataDouble = SumDataDouble.create(33.3);
 
-    assertThat(StackdriverExportUtils.createPoint(sumDataDouble, cumulativeData, SUM))
+    assertThat(
+            StackdriverExportUtils.createPoint(
+                sumDataDouble, SUM, censusTimestamp1, censusTimestamp2))
         .isEqualTo(
             Point.newBuilder()
-                .setInterval(StackdriverExportUtils.createTimeInterval(cumulativeData))
+                .setInterval(
+                    TimeInterval.newBuilder()
+                        .setStartTime(StackdriverExportUtils.convertTimestamp(censusTimestamp1))
+                        .setEndTime(StackdriverExportUtils.convertTimestamp(censusTimestamp2))
+                        .build())
                 .setValue(StackdriverExportUtils.createTypedValue(SUM, sumDataDouble))
                 .build());
-  }
-
-  @Test
-  public void createPoint_interval() {
-    IntervalData intervalData = IntervalData.create(Timestamp.create(200, 0));
-    SumDataDouble sumDataDouble = SumDataDouble.create(33.3);
-    // Only Cumulative view will supported in this version.
-    thrown.expect(IllegalArgumentException.class);
-    StackdriverExportUtils.createPoint(sumDataDouble, intervalData, SUM);
   }
 
   @Test
@@ -313,8 +268,7 @@ public class StackdriverExportUtilsTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Arrays.asList(KEY));
     MetricDescriptor metricDescriptor =
         StackdriverExportUtils.createMetricDescriptor(view, PROJECT_ID);
     assertThat(metricDescriptor.getName())
@@ -345,19 +299,6 @@ public class StackdriverExportUtilsTest {
   }
 
   @Test
-  public void createMetricDescriptor_interval() {
-    View view =
-        View.create(
-            Name.create(VIEW_NAME),
-            VIEW_DESCRIPTION,
-            MEASURE_DOUBLE,
-            DISTRIBUTION,
-            Arrays.asList(KEY),
-            INTERVAL);
-    assertThat(StackdriverExportUtils.createMetricDescriptor(view, PROJECT_ID)).isNull();
-  }
-
-  @Test
   public void createTimeSeriesList_cumulative() {
     View view =
         View.create(
@@ -365,8 +306,7 @@ public class StackdriverExportUtilsTest {
             VIEW_DESCRIPTION,
             MEASURE_DOUBLE,
             DISTRIBUTION,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Arrays.asList(KEY));
     DistributionData distributionData1 =
         DistributionData.create(2, 3, 0, 5, 14, Arrays.asList(0L, 1L, 1L, 0L, 1L));
     DistributionData distributionData2 =
@@ -374,9 +314,9 @@ public class StackdriverExportUtilsTest {
     Map<List<TagValue>, DistributionData> aggregationMap =
         ImmutableMap.of(
             Arrays.asList(VALUE_1), distributionData1, Arrays.asList(VALUE_2), distributionData2);
-    CumulativeData cumulativeData =
-        CumulativeData.create(Timestamp.fromMillis(1000), Timestamp.fromMillis(2000));
-    ViewData viewData = ViewData.create(view, aggregationMap, cumulativeData);
+    Timestamp censusTimestamp1 = Timestamp.fromMillis(1000);
+    Timestamp censusTimestamp2 = Timestamp.fromMillis(2000);
+    ViewData viewData = ViewData.create(view, aggregationMap, censusTimestamp1, censusTimestamp2);
     List<TimeSeries> timeSeriesList =
         StackdriverExportUtils.createTimeSeriesList(viewData, DEFAULT_RESOURCE);
     assertThat(timeSeriesList).hasSize(2);
@@ -387,7 +327,8 @@ public class StackdriverExportUtilsTest {
             .setMetric(StackdriverExportUtils.createMetric(view, Arrays.asList(VALUE_1)))
             .setResource(MonitoredResource.newBuilder().setType("global"))
             .addPoints(
-                StackdriverExportUtils.createPoint(distributionData1, cumulativeData, DISTRIBUTION))
+                StackdriverExportUtils.createPoint(
+                    distributionData1, DISTRIBUTION, censusTimestamp1, censusTimestamp2))
             .build();
     TimeSeries expected2 =
         TimeSeries.newBuilder()
@@ -396,30 +337,10 @@ public class StackdriverExportUtilsTest {
             .setMetric(StackdriverExportUtils.createMetric(view, Arrays.asList(VALUE_2)))
             .setResource(MonitoredResource.newBuilder().setType("global"))
             .addPoints(
-                StackdriverExportUtils.createPoint(distributionData2, cumulativeData, DISTRIBUTION))
+                StackdriverExportUtils.createPoint(
+                    distributionData2, DISTRIBUTION, censusTimestamp1, censusTimestamp2))
             .build();
     assertThat(timeSeriesList).containsExactly(expected1, expected2);
-  }
-
-  @Test
-  public void createTimeSeriesList_interval() {
-    View view =
-        View.create(
-            Name.create(VIEW_NAME),
-            VIEW_DESCRIPTION,
-            MEASURE_DOUBLE,
-            DISTRIBUTION,
-            Arrays.asList(KEY),
-            INTERVAL);
-    Map<List<TagValue>, DistributionData> aggregationMap =
-        ImmutableMap.of(
-            Arrays.asList(VALUE_1),
-            DistributionData.create(2, 3, 0, 5, 14, Arrays.asList(0L, 1L, 1L, 0L, 1L)),
-            Arrays.asList(VALUE_2),
-            DistributionData.create(-1, 1, -1, -1, 0, Arrays.asList(1L, 0L, 0L, 0L, 0L)));
-    ViewData viewData =
-        ViewData.create(view, aggregationMap, IntervalData.create(Timestamp.fromMillis(2000)));
-    assertThat(StackdriverExportUtils.createTimeSeriesList(viewData, DEFAULT_RESOURCE)).isEmpty();
   }
 
   @Test
@@ -428,18 +349,13 @@ public class StackdriverExportUtilsTest {
         MonitoredResource.newBuilder().setType("global").putLabels("key", "value").build();
     View view =
         View.create(
-            Name.create(VIEW_NAME),
-            VIEW_DESCRIPTION,
-            MEASURE_DOUBLE,
-            SUM,
-            Arrays.asList(KEY),
-            CUMULATIVE);
+            Name.create(VIEW_NAME), VIEW_DESCRIPTION, MEASURE_DOUBLE, SUM, Arrays.asList(KEY));
     SumDataDouble sumData = SumDataDouble.create(55.5);
     Map<List<TagValue>, SumDataDouble> aggregationMap =
         ImmutableMap.of(Arrays.asList(VALUE_1), sumData);
-    CumulativeData cumulativeData =
-        CumulativeData.create(Timestamp.fromMillis(1000), Timestamp.fromMillis(2000));
-    ViewData viewData = ViewData.create(view, aggregationMap, cumulativeData);
+    Timestamp censusTimestamp1 = Timestamp.fromMillis(1000);
+    Timestamp censusTimestamp2 = Timestamp.fromMillis(2000);
+    ViewData viewData = ViewData.create(view, aggregationMap, censusTimestamp1, censusTimestamp2);
     List<TimeSeries> timeSeriesList =
         StackdriverExportUtils.createTimeSeriesList(viewData, resource);
     assertThat(timeSeriesList)
@@ -449,7 +365,9 @@ public class StackdriverExportUtilsTest {
                 .setValueType(MetricDescriptor.ValueType.DOUBLE)
                 .setMetric(StackdriverExportUtils.createMetric(view, Arrays.asList(VALUE_1)))
                 .setResource(resource)
-                .addPoints(StackdriverExportUtils.createPoint(sumData, cumulativeData, SUM))
+                .addPoints(
+                    StackdriverExportUtils.createPoint(
+                        sumData, SUM, censusTimestamp1, censusTimestamp2))
                 .build());
   }
 }

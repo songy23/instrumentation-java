@@ -289,7 +289,7 @@ final class StatszZPageHandler extends ZPageHandler {
       return;
     }
     View view = viewData.getView();
-    emitViewInfo(view, viewData.getWindowData(), out, formatter);
+    emitViewInfo(view, viewData.getStart(), viewData.getEnd(), out, formatter);
     formatter.format(
         "<p class=\"%s\">Stats for View %s</p>", CLASS_LARGER_TR, view.getName().asString());
     out.write("<p></p>");
@@ -304,7 +304,7 @@ final class StatszZPageHandler extends ZPageHandler {
   }
 
   private static void emitViewInfo(
-      View view, ViewData.AggregationWindowData windowData, PrintWriter out, Formatter formatter) {
+      View view, Timestamp start, Timestamp end, PrintWriter out, Formatter formatter) {
     formatter.format("<table width=100%% %s>", TABLE_BORDER);
     emitViewInfoHeader(out, formatter);
 
@@ -322,17 +322,8 @@ final class StatszZPageHandler extends ZPageHandler {
                 Functions.returnConstant("Distribution"),
                 Functions.<String>throwAssertionError());
     formatter.format("<td>%s</td>", aggregationType);
-    windowData.match(
-        new Function<ViewData.AggregationWindowData.CumulativeData, Void>() {
-          @Override
-          public Void apply(ViewData.AggregationWindowData.CumulativeData arg) {
-            formatter.format("<td>%s</td>", toDate(arg.getStart()));
-            formatter.format("<td>%s</td>", toDate(arg.getEnd()));
-            return null;
-          }
-        },
-        Functions.</*@Nullable*/ Void>throwAssertionError(), // No interval views will be displayed.
-        Functions.</*@Nullable*/ Void>throwAssertionError());
+    formatter.format("<td>%s</td>", toDate(start));
+    formatter.format("<td>%s</td>", toDate(end));
     out.write("</tr>");
     out.write("</tbody>");
     out.write("</table>");

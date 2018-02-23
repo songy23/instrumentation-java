@@ -47,7 +47,6 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 */
 
 /** Adapter for a {@code ViewData}'s contents into SignalFx datapoints. */
-@SuppressWarnings("deprecation")
 final class SignalFxSessionAdaptor {
 
   private SignalFxSessionAdaptor() {}
@@ -66,7 +65,7 @@ final class SignalFxSessionAdaptor {
     View view = data.getView();
     List<TagKey> keys = view.getColumns();
 
-    MetricType metricType = getMetricTypeForAggregation(view.getAggregation(), view.getWindow());
+    MetricType metricType = getMetricTypeForAggregation(view.getAggregation());
     if (metricType == null) {
       return Collections.emptyList();
     }
@@ -87,15 +86,11 @@ final class SignalFxSessionAdaptor {
 
   @VisibleForTesting
   @javax.annotation.Nullable
-  static MetricType getMetricTypeForAggregation(
-      Aggregation aggregation, View.AggregationWindow window) {
+  static MetricType getMetricTypeForAggregation(Aggregation aggregation) {
     if (aggregation instanceof Aggregation.Mean) {
       return MetricType.GAUGE;
     } else if (aggregation instanceof Aggregation.Count || aggregation instanceof Aggregation.Sum) {
-      if (window instanceof View.AggregationWindow.Cumulative) {
-        return MetricType.CUMULATIVE_COUNTER;
-      }
-      // TODO(mpetazzoni): support incremental counters when AggregationWindow.Interval is ready
+      return MetricType.CUMULATIVE_COUNTER;
     }
 
     // TODO(mpetazzoni): add support for histograms (Aggregation.Distribution).

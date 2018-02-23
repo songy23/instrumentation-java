@@ -24,7 +24,6 @@ import static io.opencensus.exporter.stats.prometheus.PrometheusExportUtils.SAMP
 import static io.opencensus.exporter.stats.prometheus.PrometheusExportUtils.SAMPLE_SUFFIX_SUM;
 
 import com.google.common.collect.ImmutableMap;
-import io.opencensus.common.Duration;
 import io.opencensus.common.Timestamp;
 import io.opencensus.stats.Aggregation.Count;
 import io.opencensus.stats.Aggregation.Distribution;
@@ -38,11 +37,7 @@ import io.opencensus.stats.AggregationData.SumDataLong;
 import io.opencensus.stats.BucketBoundaries;
 import io.opencensus.stats.Measure.MeasureDouble;
 import io.opencensus.stats.View;
-import io.opencensus.stats.View.AggregationWindow.Cumulative;
-import io.opencensus.stats.View.AggregationWindow.Interval;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
-import io.opencensus.stats.ViewData.AggregationWindowData.IntervalData;
 import io.opencensus.tags.TagKey;
 import io.opencensus.tags.TagValue;
 import io.prometheus.client.Collector.MetricFamilySamples;
@@ -62,9 +57,6 @@ public class PrometheusExportUtilsTest {
 
   @Rule public final ExpectedException thrown = ExpectedException.none();
 
-  private static final Duration ONE_SECOND = Duration.create(1, 0);
-  private static final Cumulative CUMULATIVE = Cumulative.create();
-  private static final Interval INTERVAL = Interval.create(ONE_SECOND);
   private static final Sum SUM = Sum.create();
   private static final Count COUNT = Count.create();
   private static final Mean MEAN = Mean.create();
@@ -91,19 +83,14 @@ public class PrometheusExportUtilsTest {
   private static final DistributionData DISTRIBUTION_DATA =
       DistributionData.create(4.4, 5, -3.2, 15.7, 135.22, Arrays.asList(0L, 2L, 2L, 1L));
   private static final View VIEW1 =
-      View.create(
-          VIEW_NAME_1, DESCRIPTION, MEASURE_DOUBLE, COUNT, Arrays.asList(K1, K2), CUMULATIVE);
+      View.create(VIEW_NAME_1, DESCRIPTION, MEASURE_DOUBLE, COUNT, Arrays.asList(K1, K2));
   private static final View VIEW2 =
-      View.create(VIEW_NAME_2, DESCRIPTION, MEASURE_DOUBLE, MEAN, Arrays.asList(K3), CUMULATIVE);
+      View.create(VIEW_NAME_2, DESCRIPTION, MEASURE_DOUBLE, MEAN, Arrays.asList(K3));
   private static final View VIEW3 =
-      View.create(
-          VIEW_NAME_3, DESCRIPTION, MEASURE_DOUBLE, DISTRIBUTION, Arrays.asList(K1), CUMULATIVE);
-  private static final View VIEW4 =
-      View.create(VIEW_NAME_4, DESCRIPTION, MEASURE_DOUBLE, COUNT, Arrays.asList(K1), INTERVAL);
-  private static final CumulativeData CUMULATIVE_DATA =
-      CumulativeData.create(Timestamp.fromMillis(1000), Timestamp.fromMillis(2000));
-  private static final IntervalData INTERVAL_DATA = IntervalData.create(Timestamp.fromMillis(1000));
+      View.create(VIEW_NAME_3, DESCRIPTION, MEASURE_DOUBLE, DISTRIBUTION, Arrays.asList(K1));
   private static final String SAMPLE_NAME = OPENCENSUS_NAMESPACE + "_view";
+  private static final Timestamp TIMESTAMP_1 = Timestamp.fromMillis(1000);
+  private static final Timestamp TIMESTAMP_2 = Timestamp.fromMillis(2000);
 
   @Test
   public void testConstants() {
@@ -116,11 +103,10 @@ public class PrometheusExportUtilsTest {
 
   @Test
   public void getType() {
-    assertThat(PrometheusExportUtils.getType(COUNT, INTERVAL)).isEqualTo(Type.UNTYPED);
-    assertThat(PrometheusExportUtils.getType(COUNT, CUMULATIVE)).isEqualTo(Type.COUNTER);
-    assertThat(PrometheusExportUtils.getType(DISTRIBUTION, CUMULATIVE)).isEqualTo(Type.HISTOGRAM);
-    assertThat(PrometheusExportUtils.getType(SUM, CUMULATIVE)).isEqualTo(Type.UNTYPED);
-    assertThat(PrometheusExportUtils.getType(MEAN, CUMULATIVE)).isEqualTo(Type.SUMMARY);
+    assertThat(PrometheusExportUtils.getType(COUNT)).isEqualTo(Type.COUNTER);
+    assertThat(PrometheusExportUtils.getType(DISTRIBUTION)).isEqualTo(Type.HISTOGRAM);
+    assertThat(PrometheusExportUtils.getType(SUM)).isEqualTo(Type.UNTYPED);
+    assertThat(PrometheusExportUtils.getType(MEAN)).isEqualTo(Type.SUMMARY);
   }
 
   @Test
@@ -144,13 +130,6 @@ public class PrometheusExportUtilsTest {
             new MetricFamilySamples(
                 OPENCENSUS_NAMESPACE + "_view_3",
                 Type.HISTOGRAM,
-                OPENCENSUS_HELP_MSG + DESCRIPTION,
-                Collections.<Sample>emptyList()));
-    assertThat(PrometheusExportUtils.createDescribableMetricFamilySamples(VIEW4))
-        .isEqualTo(
-            new MetricFamilySamples(
-                OPENCENSUS_NAMESPACE + "__view4",
-                Type.UNTYPED,
                 OPENCENSUS_HELP_MSG + DESCRIPTION,
                 Collections.<Sample>emptyList()));
   }
@@ -205,7 +184,10 @@ public class PrometheusExportUtilsTest {
     assertThat(
             PrometheusExportUtils.createMetricFamilySamples(
                 ViewData.create(
-                    VIEW1, ImmutableMap.of(Arrays.asList(V1, V2), COUNT_DATA), CUMULATIVE_DATA)))
+                    VIEW1,
+                    ImmutableMap.of(Arrays.asList(V1, V2), COUNT_DATA),
+                    TIMESTAMP_1,
+                    TIMESTAMP_2)))
         .isEqualTo(
             new MetricFamilySamples(
                 OPENCENSUS_NAMESPACE + "_view1",
@@ -220,7 +202,10 @@ public class PrometheusExportUtilsTest {
     assertThat(
             PrometheusExportUtils.createMetricFamilySamples(
                 ViewData.create(
-                    VIEW2, ImmutableMap.of(Arrays.asList(V1), MEAN_DATA), CUMULATIVE_DATA)))
+                    VIEW2,
+                    ImmutableMap.of(Arrays.asList(V1), MEAN_DATA),
+                    TIMESTAMP_1,
+                    TIMESTAMP_2)))
         .isEqualTo(
             new MetricFamilySamples(
                 OPENCENSUS_NAMESPACE + "_view2",
@@ -240,7 +225,10 @@ public class PrometheusExportUtilsTest {
     assertThat(
             PrometheusExportUtils.createMetricFamilySamples(
                 ViewData.create(
-                    VIEW3, ImmutableMap.of(Arrays.asList(V3), DISTRIBUTION_DATA), CUMULATIVE_DATA)))
+                    VIEW3,
+                    ImmutableMap.of(Arrays.asList(V3), DISTRIBUTION_DATA),
+                    TIMESTAMP_1,
+                    TIMESTAMP_2)))
         .isEqualTo(
             new MetricFamilySamples(
                 OPENCENSUS_NAMESPACE + "_view_3",
@@ -277,20 +265,5 @@ public class PrometheusExportUtilsTest {
                         Arrays.asList("k1"),
                         Arrays.asList("v-3"),
                         22.0))));
-    assertThat(
-            PrometheusExportUtils.createMetricFamilySamples(
-                ViewData.create(
-                    VIEW4, ImmutableMap.of(Arrays.asList(V1), COUNT_DATA), INTERVAL_DATA)))
-        .isEqualTo(
-            new MetricFamilySamples(
-                OPENCENSUS_NAMESPACE + "__view4",
-                Type.UNTYPED,
-                OPENCENSUS_HELP_MSG + DESCRIPTION,
-                Arrays.asList(
-                    new Sample(
-                        OPENCENSUS_NAMESPACE + "__view4",
-                        Arrays.asList("k1"),
-                        Arrays.asList("v1"),
-                        12345))));
   }
 }

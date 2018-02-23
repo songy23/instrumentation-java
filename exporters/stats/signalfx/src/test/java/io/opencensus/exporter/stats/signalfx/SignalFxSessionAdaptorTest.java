@@ -29,7 +29,6 @@ import com.signalfx.metrics.protobuf.SignalFxProtocolBuffers.DataPoint;
 import com.signalfx.metrics.protobuf.SignalFxProtocolBuffers.Datum;
 import com.signalfx.metrics.protobuf.SignalFxProtocolBuffers.Dimension;
 import com.signalfx.metrics.protobuf.SignalFxProtocolBuffers.MetricType;
-import io.opencensus.common.Duration;
 import io.opencensus.stats.Aggregation;
 import io.opencensus.stats.AggregationData;
 import io.opencensus.stats.AggregationData.CountData;
@@ -39,7 +38,6 @@ import io.opencensus.stats.AggregationData.SumDataDouble;
 import io.opencensus.stats.AggregationData.SumDataLong;
 import io.opencensus.stats.BucketBoundaries;
 import io.opencensus.stats.View;
-import io.opencensus.stats.View.AggregationWindow;
 import io.opencensus.stats.View.Name;
 import io.opencensus.stats.ViewData;
 import io.opencensus.tags.TagKey;
@@ -58,8 +56,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class SignalFxSessionAdaptorTest {
 
-  private static final Duration ONE_SECOND = Duration.create(1, 0);
-
   @Rule public final ExpectedException thrown = ExpectedException.none();
 
   @Mock private View view;
@@ -75,39 +71,19 @@ public class SignalFxSessionAdaptorTest {
 
   @Test
   public void checkMetricTypeFromAggregation() {
-    assertNull(SignalFxSessionAdaptor.getMetricTypeForAggregation(null, null));
-    assertNull(
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            null, AggregationWindow.Cumulative.create()));
+    assertNull(SignalFxSessionAdaptor.getMetricTypeForAggregation(null));
     assertEquals(
         MetricType.GAUGE,
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Mean.create(), AggregationWindow.Cumulative.create()));
-    assertEquals(
-        MetricType.GAUGE,
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Mean.create(), AggregationWindow.Interval.create(ONE_SECOND)));
+        SignalFxSessionAdaptor.getMetricTypeForAggregation(Aggregation.Mean.create()));
     assertEquals(
         MetricType.CUMULATIVE_COUNTER,
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Count.create(), AggregationWindow.Cumulative.create()));
+        SignalFxSessionAdaptor.getMetricTypeForAggregation(Aggregation.Count.create()));
     assertEquals(
         MetricType.CUMULATIVE_COUNTER,
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Sum.create(), AggregationWindow.Cumulative.create()));
-    assertNull(
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(Aggregation.Count.create(), null));
-    assertNull(SignalFxSessionAdaptor.getMetricTypeForAggregation(Aggregation.Sum.create(), null));
+        SignalFxSessionAdaptor.getMetricTypeForAggregation(Aggregation.Sum.create()));
     assertNull(
         SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Count.create(), AggregationWindow.Interval.create(ONE_SECOND)));
-    assertNull(
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Sum.create(), AggregationWindow.Interval.create(ONE_SECOND)));
-    assertNull(
-        SignalFxSessionAdaptor.getMetricTypeForAggregation(
-            Aggregation.Distribution.create(BucketBoundaries.create(ImmutableList.of(3.14d))),
-            AggregationWindow.Cumulative.create()));
+            Aggregation.Distribution.create(BucketBoundaries.create(ImmutableList.of(3.14d)))));
   }
 
   @Test
@@ -144,7 +120,6 @@ public class SignalFxSessionAdaptorTest {
     Mockito.when(view.getAggregation())
         .thenReturn(
             Aggregation.Distribution.create(BucketBoundaries.create(ImmutableList.of(3.14d))));
-    Mockito.when(view.getWindow()).thenReturn(AggregationWindow.Cumulative.create());
     List<DataPoint> datapoints = SignalFxSessionAdaptor.adapt(viewData);
     assertEquals(0, datapoints.size());
   }
@@ -152,7 +127,6 @@ public class SignalFxSessionAdaptorTest {
   @Test
   public void noAggregationDataYieldsNoDatapoints() {
     Mockito.when(view.getAggregation()).thenReturn(Aggregation.Count.create());
-    Mockito.when(view.getWindow()).thenReturn(AggregationWindow.Cumulative.create());
     List<DataPoint> datapoints = SignalFxSessionAdaptor.adapt(viewData);
     assertEquals(0, datapoints.size());
   }
@@ -215,7 +189,6 @@ public class SignalFxSessionAdaptorTest {
             SumDataLong.create(3L));
     Mockito.when(viewData.getAggregationMap()).thenReturn(map);
     Mockito.when(view.getAggregation()).thenReturn(Aggregation.Count.create());
-    Mockito.when(view.getWindow()).thenReturn(AggregationWindow.Cumulative.create());
 
     List<DataPoint> datapoints = SignalFxSessionAdaptor.adapt(viewData);
     assertEquals(2, datapoints.size());
@@ -256,7 +229,6 @@ public class SignalFxSessionAdaptorTest {
             SumDataLong.create(3L));
     Mockito.when(viewData.getAggregationMap()).thenReturn(map);
     Mockito.when(view.getAggregation()).thenReturn(Aggregation.Count.create());
-    Mockito.when(view.getWindow()).thenReturn(AggregationWindow.Cumulative.create());
 
     List<DataPoint> datapoints = SignalFxSessionAdaptor.adapt(viewData);
     assertEquals(2, datapoints.size());

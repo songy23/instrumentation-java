@@ -127,7 +127,7 @@ public final class ZPageHandlers {
   /**
    * Returns a {@code ZPageHandler} for all registered {@link View}s and {@link Measure}s.
    *
-   * <p>Only {@code Cumulative} views are exported. {@link View}s are grouped by directories.
+   * <p>{@link View}s are grouped by directories.
    *
    * @return a {@code ZPageHandler} for all registered {@code View}s and {@code Measure}s.
    * @since 0.12.0

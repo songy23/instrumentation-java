@@ -53,8 +53,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * Util methods to convert OpenCensus Stats data models to Prometheus data models.
  *
  * <p>Each OpenCensus {@link View} will be converted to a Prometheus {@link MetricFamilySamples}
- * with no {@link Sample}s, and is used for registering Prometheus {@code Metric}s. Only {@code
- * Cumulative} views are supported. All views are under namespace "opencensus".
+ * with no {@link Sample}s, and is used for registering Prometheus {@code Metric}s. All views are
+ * under namespace "opencensus".
  *
  * <p>{@link Aggregation} will be converted to a corresponding Prometheus {@link Type}. {@link Sum}
  * will be {@link Type#UNTYPED}, {@link Count} will be {@link Type#COUNTER}, {@link Mean} will be
@@ -76,7 +76,6 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * <p>Please note that Prometheus Metric and Label name can only have alphanumeric characters and
  * underscore. All other characters will be sanitized by underscores.
  */
-@SuppressWarnings("deprecation")
 final class PrometheusExportUtils {
 
   @VisibleForTesting static final String OPENCENSUS_NAMESPACE = "opencensus";
@@ -90,7 +89,7 @@ final class PrometheusExportUtils {
     View view = viewData.getView();
     String name =
         Collector.sanitizeMetricName(OPENCENSUS_NAMESPACE + '_' + view.getName().asString());
-    Type type = getType(view.getAggregation(), view.getWindow());
+    Type type = getType(view.getAggregation());
     List<Sample> samples = Lists.newArrayList();
     for (Entry<List</*@Nullable*/ TagValue>, AggregationData> entry :
         viewData.getAggregationMap().entrySet()) {
@@ -105,16 +104,13 @@ final class PrometheusExportUtils {
   static MetricFamilySamples createDescribableMetricFamilySamples(View view) {
     String name =
         Collector.sanitizeMetricName(OPENCENSUS_NAMESPACE + '_' + view.getName().asString());
-    Type type = getType(view.getAggregation(), view.getWindow());
+    Type type = getType(view.getAggregation());
     return new MetricFamilySamples(
         name, type, OPENCENSUS_HELP_MSG + view.getDescription(), Collections.<Sample>emptyList());
   }
 
   @VisibleForTesting
-  static Type getType(Aggregation aggregation, View.AggregationWindow window) {
-    if (!(window instanceof View.AggregationWindow.Cumulative)) {
-      return Type.UNTYPED;
-    }
+  static Type getType(Aggregation aggregation) {
     return aggregation.match(
         Functions.returnConstant(Type.UNTYPED), // SUM
         Functions.returnConstant(Type.COUNTER), // COUNT

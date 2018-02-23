@@ -28,9 +28,7 @@ import io.opencensus.stats.BucketBoundaries;
 import io.opencensus.stats.Measure.MeasureDouble;
 import io.opencensus.stats.Stats;
 import io.opencensus.stats.View;
-import io.opencensus.stats.View.AggregationWindow.Cumulative;
 import io.opencensus.stats.ViewData;
-import io.opencensus.stats.ViewData.AggregationWindowData.CumulativeData;
 import io.opencensus.stats.ViewManager;
 import io.opencensus.tags.TagKey;
 import io.opencensus.tags.TagValue;
@@ -54,7 +52,6 @@ public class PrometheusStatsCollectorTest {
 
   @Rule public final ExpectedException thrown = ExpectedException.none();
 
-  private static final Cumulative CUMULATIVE = Cumulative.create();
   private static final BucketBoundaries BUCKET_BOUNDARIES =
       BucketBoundaries.create(Arrays.asList(-5.0, 0.0, 5.0));
   private static final Distribution DISTRIBUTION = Distribution.create(BUCKET_BOUNDARIES);
@@ -69,13 +66,15 @@ public class PrometheusStatsCollectorTest {
   private static final DistributionData DISTRIBUTION_DATA =
       DistributionData.create(4.4, 5, -3.2, 15.7, 135.22, Arrays.asList(0L, 2L, 2L, 1L));
   private static final View VIEW =
-      View.create(
-          VIEW_NAME, DESCRIPTION, MEASURE_DOUBLE, DISTRIBUTION, Arrays.asList(K1, K2), CUMULATIVE);
-  private static final CumulativeData CUMULATIVE_DATA =
-      CumulativeData.create(Timestamp.fromMillis(1000), Timestamp.fromMillis(2000));
+      View.create(VIEW_NAME, DESCRIPTION, MEASURE_DOUBLE, DISTRIBUTION, Arrays.asList(K1, K2));
+  private static final Timestamp TIMESTAMP_1 = Timestamp.fromMillis(1000);
+  private static final Timestamp TIMESTAMP_2 = Timestamp.fromMillis(2000);
   private static final ViewData VIEW_DATA =
       ViewData.create(
-          VIEW, ImmutableMap.of(Arrays.asList(V1, V2), DISTRIBUTION_DATA), CUMULATIVE_DATA);
+          VIEW,
+          ImmutableMap.of(Arrays.asList(V1, V2), DISTRIBUTION_DATA),
+          TIMESTAMP_1,
+          TIMESTAMP_2);
 
   @Mock private ViewManager mockViewManager;
 

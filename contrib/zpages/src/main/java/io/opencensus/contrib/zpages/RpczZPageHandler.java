@@ -82,6 +82,7 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.opencensus.common.Duration;
+import io.opencensus.common.Timestamp;
 import io.opencensus.stats.AggregationData;
 import io.opencensus.stats.AggregationData.CountData;
 import io.opencensus.stats.AggregationData.DistributionData;
@@ -356,17 +357,14 @@ final class RpczZPageHandler extends ZPageHandler {
           map.put(method, snapshot);
         }
 
-        getStats(snapshot, entry.getValue(), view, viewData.getWindowData());
+        getStats(snapshot, entry.getValue(), view, viewData.getStart(), viewData.getEnd());
       }
     }
   }
 
   // Gets RPC stats by its view definition, and set it to stats snapshot.
   private static void getStats(
-      StatsSnapshot snapshot,
-      AggregationData data,
-      View view,
-      ViewData.AggregationWindowData windowData) {
+      StatsSnapshot snapshot, AggregationData data, View view, Timestamp start, Timestamp end) {
     if (view == RPC_CLIENT_ROUNDTRIP_LATENCY_VIEW || view == RPC_SERVER_SERVER_LATENCY_VIEW) {
       snapshot.avgLatencyTotal = ((DistributionData) data).getMean();
     } else if (view == RPC_CLIENT_ROUNDTRIP_LATENCY_MINUTE_VIEW
@@ -389,7 +387,7 @@ final class RpczZPageHandler extends ZPageHandler {
           distributionData.getCount()
               * distributionData.getMean()
               / BYTES_PER_KB
-              / getDurationInSecs((ViewData.AggregationWindowData.CumulativeData) windowData);
+              / getDurationInSecs(start, end);
     } else if (view == RPC_CLIENT_REQUEST_BYTES_MINUTE_VIEW
         || view == RPC_SERVER_REQUEST_BYTES_MINUTE_VIEW) {
       MeanData meanData = (MeanData) data;
@@ -406,7 +404,7 @@ final class RpczZPageHandler extends ZPageHandler {
           distributionData.getCount()
               * distributionData.getMean()
               / BYTES_PER_KB
-              / getDurationInSecs((ViewData.AggregationWindowData.CumulativeData) windowData);
+              / getDurationInSecs(start, end);
     } else if (view == RPC_CLIENT_RESPONSE_BYTES_MINUTE_VIEW
         || view == RPC_SERVER_RESPONSE_BYTES_MINUTE_VIEW) {
       MeanData meanData = (MeanData) data;
@@ -428,16 +426,13 @@ final class RpczZPageHandler extends ZPageHandler {
     } else if (view == RPC_CLIENT_STARTED_COUNT_CUMULATIVE_VIEW
         || view == RPC_SERVER_STARTED_COUNT_CUMULATIVE_VIEW) {
       snapshot.countTotal = ((CountData) data).getCount();
-      snapshot.rpcRateTotal =
-          snapshot.countTotal
-              / getDurationInSecs((ViewData.AggregationWindowData.CumulativeData) windowData);
+      snapshot.rpcRateTotal = snapshot.countTotal / getDurationInSecs(start, end);
     } // TODO(songya): compute and store latency percentiles.
   }
 
-  // Calculates the duration of the given CumulativeData in seconds.
-  private static double getDurationInSecs(
-      ViewData.AggregationWindowData.CumulativeData cumulativeData) {
-    return toDoubleSeconds(cumulativeData.getEnd().subtractTimestamp(cumulativeData.getStart()));
+  // Calculates the duration (in seconds) of the given start and end timestamp.
+  private static double getDurationInSecs(Timestamp start, Timestamp end) {
+    return toDoubleSeconds(end.subtractTimestamp(start));
   }
 
   // Converts a Duration to seconds. Converts the nanoseconds of the given duration to decimals of
